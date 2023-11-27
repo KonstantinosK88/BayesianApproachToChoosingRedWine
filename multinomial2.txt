@@ -1,0 +1,113 @@
+# multinomial logistic regression after removing unimportant variables according to BIC in BAS
+model {
+   for (i in 1:1599){                                     ## loop over observations
+     y[i,1] ~ dcat(p[i, 1:6])                             ## multinomial outcome
+
+     for (j in 1:5){                                      ## loop over categories
+      p[i,j] <- expeta[i,j]/(1 + expeta[i,1] +
+                             expeta[i,2] + expeta[i,3] + 
+                             expeta[i,4] + expeta[i,5])
+
+      expeta[i,j] <- exp(eta[i,j])
+      }
+      eta[i,1] <- b01 + b11*x[i,1] + b21*x[i,2] + b51*x[i,5] + b61*x[i,6] + b71*x[i,7] + b91*x[i,9] + b111*x[i,11]
+      eta[i,2] <- b02 + b22*x[i,2] + b42*x[i,4] + b72*x[i,7] + b92*x[i,9]
+      eta[i,3] <- b03 + b23*x[i,2] + b53*x[i,5] + b63*x[i,6] + b73*x[i,7] + b103*x[i,10] + b113*x[i,11]
+      eta[i,4] <- b04 + b14*x[i,1] + b24*x[i,2] + b44*x[i,4] + b54*x[i,5] + b64*x[i,6] + b74*x[i,7] + b84*x[i,8] + b104*x[i,10] + b114*x[i,11]
+      eta[i,5] <- b05 + b15*x[i,1] + b35*x[i,3] + b45*x[i,4] + b55*x[i,5] + b65*x[i,6] + b75*x[i,7] + b95*x[i,9] + b105*x[i,10] + b115*x[i,11]
+
+     expeta[i,6] <- 1.0                                  ## baseline (reference) category
+     p[i,6] <- 1/(1 + expeta[i,1] +
+                  expeta[i,2] + expeta[i,3] + 
+                  expeta[i,4] + expeta[i,5])
+   }
+## ------------
+##    Priors
+## ------------
+   
+    b01 ~ dnorm(0.0, 1.0E-4)                      ## low-information priors
+    b02 ~ dnorm(0.0, 1.0E-4)
+    b03 ~ dnorm(0.0, 1.0E-4)
+    b04 ~ dnorm(0.0, 1.0E-4)
+    b05 ~ dnorm(0.0, 1.0E-4)
+    b11 ~ dnorm(0.0, 1.0E-4)
+    b14 ~ dnorm(0.0, 1.0E-4)
+    b15 ~ dnorm(0.0, 1.0E-4)
+    b21 ~ dnorm(0.0, 1.0E-4)
+    b22 ~ dnorm(0.0, 1.0E-4)
+    b23 ~ dnorm(0.0, 1.0E-4)
+    b24 ~ dnorm(0.0, 1.0E-4)
+    b35 ~ dnorm(0.0, 1.0E-4)
+    b42 ~ dnorm(0.0, 1.0E-4)
+    b44 ~ dnorm(0.0, 1.0E-4)
+    b45 ~ dnorm(0.0, 1.0E-4)
+    b51 ~ dnorm(0.0, 1.0E-4)
+    b53 ~ dnorm(0.0, 1.0E-4)
+    b54 ~ dnorm(0.0, 1.0E-4)
+    b55 ~ dnorm(0.0, 1.0E-4)
+    b61 ~ dnorm(0.0, 1.0E-4)
+    b63 ~ dnorm(0.0, 1.0E-4)
+    b64 ~ dnorm(0.0, 1.0E-4)
+    b65 ~ dnorm(0.0, 1.0E-4)
+    b71 ~ dnorm(0.0, 1.0E-4)
+    b72 ~ dnorm(0.0, 1.0E-4)
+    b73 ~ dnorm(0.0, 1.0E-4)
+    b74 ~ dnorm(0.0, 1.0E-4)
+    b75 ~ dnorm(0.0, 1.0E-4)
+    b84 ~ dnorm(0.0, 1.0E-4)
+    b91 ~ dnorm(0.0, 1.0E-4)
+    b92 ~ dnorm(0.0, 1.0E-4)
+    b95 ~ dnorm(0.0, 1.0E-4)
+    b103 ~ dnorm(0.0, 1.0E-4)
+    b104 ~ dnorm(0.0, 1.0E-4)
+    b105 ~ dnorm(0.0, 1.0E-4)
+    b111 ~ dnorm(0.0, 1.0E-4)
+    b113 ~ dnorm(0.0, 1.0E-4)
+    b114 ~ dnorm(0.0, 1.0E-4)
+    b115 ~ dnorm(0.0, 1.0E-4)
+
+## --------------------
+##    Exponentiated
+## --------------------
+    B01 <- exp(b01)
+    B02 <- exp(b02)
+    B03 <- exp(b03)
+    B04 <- exp(b04)
+    B05 <- exp(b05)
+    B11 <- exp(b11)
+    B14 <- exp(b14)
+    B15 <- exp(b15)
+    B21 <- exp(b21)
+    B22 <- exp(b22)
+    B23 <- exp(b23)
+    B24 <- exp(b24)
+    B35 <- exp(b35)
+    B42 <- exp(b42)
+    B44 <- exp(b44)
+    B45 <- exp(b45)
+    B51 <- exp(b51)
+    B53 <- exp(b53)
+    B54 <- exp(b54)
+    B55 <- exp(b55)
+    B61 <- exp(b61)
+    B63 <- exp(b63)
+    B64 <- exp(b64)
+    B65 <- exp(b65)
+    B71 <- exp(b71)
+    B72 <- exp(b72)
+    B73 <- exp(b73)
+    B74 <- exp(b74)
+    B75 <- exp(b75)
+    B84 <- exp(b84)
+    B91 <- exp(b91)
+    B92 <- exp(b92)
+    B95 <- exp(b95)
+    B103 <- exp(b103)
+    B104 <- exp(b104)
+    B105 <- exp(b105)
+    B111 <- exp(b111)
+    B113 <- exp(b113)
+    B114 <- exp(b114)
+    B115 <- exp(b115)
+
+}

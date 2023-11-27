@@ -1,0 +1,48 @@
+# multinomial logistic regression
+model {
+   for (i in 1:1599){                                     ## loop over observations
+     y[i,1] ~ dcat(p[i, 1:6])                             ## multinomial outcome
+
+     for (j in 1:5){                                      ## loop over categories
+      p[i,j] <- expeta[i,j]/(1 + expeta[i,1] +
+                             expeta[i,2] + expeta[i,3] + 
+                             expeta[i,4] + expeta[i,5])
+
+      expeta[i,j] <- exp(eta[i,j])
+      eta[i,j] <- b0[j] +
+                  b1[j]*x[i,1] + 
+                  b2[j]*x[i,2] +
+                  b3[j]*x[i,3] + 
+                  b4[j]*x[i,4] + 
+                  b5[j]*x[i,5] + 
+                  b6[j]*x[i,6] +
+                  b7[j]*x[i,7] + 
+                  b8[j]*x[i,8] +
+                  b9[j]*x[i,9] + 
+                  b10[j]*x[i,10] + 
+                  b11[j]*x[i,11]
+
+     }
+     expeta[i,6] <- 1.0                                  ## baseline (reference) category
+     p[i,6] <- 1/(1 + expeta[i,1] +
+                  expeta[i,2] + expeta[i,3] + 
+                  expeta[i,4] + expeta[i,5])
+   }
+## ------------
+##    Priors
+## ------------
+   for (k in 1:5){
+    b0[k] ~ dnorm(0.0, 1.0E-4)                      ## low-information priors
+    b1[k] ~ dnorm(0.0, 1.0E-4)
+    b2[k] ~ dnorm(0.0, 1.0E-4)
+    b3[k] ~ dnorm(0.0, 1.0E-4)
+    b4[k] ~ dnorm(0.0, 1.0E-4)
+    b5[k] ~ dnorm(0.0, 1.0E-4)
+    b6[k] ~ dnorm(0.0, 1.0E-4)
+    b7[k] ~ dnorm(0.0, 1.0E-4)
+    b8[k] ~ dnorm(0.0, 1.0E-4)
+    b9[k] ~ dnorm(0.0, 1.0E-4)
+    b10[k] ~ dnorm(0.0, 1.0E-4)
+    b11[k] ~ dnorm(0.0, 1.0E-4)
+   }
+}

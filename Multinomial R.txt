@@ -1,0 +1,1526 @@
+######################################################################
+# Initial Statistics & Plots for our Analysis.
+#=====================================================================
+## Load the data into R.
+wines <- read.csv("C:\\Users\\30697\\Desktop\\06_winequality-red.csv", header = T, sep=";", stringsAsFactors = FALSE)
+
+## Check for missing values (no missing values).
+any(is.na(wines))
+
+## Change the values from mg/dm^3 to g/dm^3 for free and total sulfur 
+## dioxide.
+wines$free.sulfur.dioxide <- wines$free.sulfur.dioxide*0.001
+wines$total.sulfur.dioxide <- wines$total.sulfur.dioxide*0.001
+
+## Get some statistics on our parameters.
+lapply(wines, mean)
+lapply(wines, min)
+lapply(wines, max)
+
+## Plot of the sensory data.
+plot(factor(wines$quality), xlab = "Sensory Preference (Median)", ylab = "Frequency (Red Wine Samples)")
+
+## Quality with 6 Categories (3-8).
+table(wines$quality)
+
+## Shift the response variable from 3 until 8, to 1 until 6, placing  
+## the third category (our reference category) to the last position.
+wines[wines[,12]==3,12] <- 1
+wines[wines[,12]==4,12] <- 2
+wines[wines[,12]==6,12] <- 3
+wines[wines[,12]==7,12] <- 4
+wines[wines[,12]==5,12] <- 6  # our reference level
+wines[wines[,12]==8,12] <- 5
+
+## Check if it worked.
+table(wines$quality)
+plot(factor(wines$quality), xlab = "Sensory Preference (Median)", ylab = "Frequency (Red Wine Samples)")
+
+## Turn our data frame into a matrix and then into a list.
+y <- as.matrix(wines$quality)
+wines <- scale(wines[,-12], center=TRUE, scale=TRUE) # centering our values (reduces run time by ~ 40 minutes)
+
+# Used for BAS later.
+wines.bas <- as.data.frame(wines)
+wines.bas$quality <- as.vector(y)
+
+wines1 <- as.matrix(wines)
+lwines <- list(y=y,x=wines1[,1:11])
+
+
+######################################################################
+# Run our Model in R.
+#=====================================================================
+## Load libraries.
+library(R2WinBUGS)
+library(BRugs)
+
+## Set the directory.
+openbugs.dir <- "D:\\OpenBUGS323"
+
+## A list of initials (one chain).
+inits1 <- list(  
+	list(b0=rep(0, times=5), b1=rep(0, times=5), b2=rep(0, times=5), 
+             b3=rep(0, times=5), b4=rep(0, times=5), b5=rep(0, times=5), 
+             b6=rep(0, times=5), b7=rep(0, times=5), b8=rep(0, times=5), 
+             b9=rep(0, times=5), b10=rep(0, times=5), 
+             b11=rep(0, times=5)) )
+
+## The parameters of interest.
+parameter.names <- c( 'b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11') 
+
+## The model (in OpenBUGS). (Run time for 1 chain ~ 85 minutes)
+model1.sim <- bugs( lwines, inits1, model.file = "C:\\Users\\30697\\Desktop\\multinomial.txt", parameters = parameter.names,
+         n.chains = 1, n.iter = 31000, n.burnin=1000, n.thin=30,  bugs.directory = openbugs.dir, debug=F, program="OpenBUGS")
+
+## The model (in JAGS). lag ~ 30, DIC=3046.459 (problems b0, b1, b8, b9, b11).(Run Time for 3 chains ~ 30 hours)
+# install.packages("jagsUI")
+# library(jagsUI)
+# mod1 <- jagsUI::jags(model.file = "C:\\Users\\30697\\Desktop\\multinomial.txt", data = lwines, inits = NULL, 
+# parameters.to.save = parameter.names, n.chains = 3, n.iter = 31000, n.burnin = 1000, n.thin=30)
+
+
+######################################################################
+# Check for convergence using plots and CODA
+#=====================================================================
+
+library(coda)
+temp<-as.mcmc.list(model1.sim)
+summary(temp)
+summary(temp)$statistics[,"Naive SE"]
+summary(temp)$statistics[,"Time-series SE"]
+batchSE(temp) 
+effectiveSize(temp)
+
+## Ineffective size, some are < 200, but it's okay.
+
+## 1000 samples (iterations) allow for the following test:
+geweke.diag(temp)
+heidel.diag(temp)
+
+## Imperfect convergence due to multicollinear value (fixed.acidity)
+## and maybe free.sulfur.dioxide
+pairs(wines.bas)
+pairs(wines.bas[c(1,8,9)])
+pairs(wines.bas[c(6,7)])
+
+
+##---------------------------------------------------------------------
+## For the OpenBUGS program.
+##---------------------------------------------------------------------
+## Ergodic Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+for (i in 1:5){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b0",i)))
+}
+
+for (i in 6:10){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b1",i-5)))
+}
+
+for (i in 11:15){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b2",i-10)))
+}
+
+for (i in 16:20){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b3",i-15)))
+}
+
+for (i in 21:25){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b4",i-20)))
+}
+
+for (i in 26:30){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b5",i-25)))
+}
+
+for (i in 31:35){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b6",i-30)))
+}
+
+for (i in 36:40){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b7",i-35)))
+}
+
+for (i in 41:45){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b8",i-40)))
+}
+
+for (i in 46:50){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b9",i-45)))
+}
+
+for (i in 51:55){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b10",i-50)))
+}
+
+for (i in 56:60){
+plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b0",i-55)))
+}
+
+plot(cumsum(model1.sim$sims.matrix[,61])/1:length(model1.sim$sims.matrix[,61]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for deviance")))
+
+##---------------------------------------------------------------------
+## Density Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+for (i in 1:5){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b0",i)))
+}
+
+for (i in 6:10){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b1",i-5)))
+}
+
+for (i in 11:15){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b2",i-10)))
+}
+
+for (i in 16:20){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b3",i-15)))
+}
+
+for (i in 21:25){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b4",i-20)))
+}
+
+for (i in 26:30){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b5",i-25)))
+}
+
+for (i in 31:35){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b6",i-30)))
+}
+
+for (i in 36:40){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b7",i-35)))
+}
+
+for (i in 41:45){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b8",i-40)))
+}
+
+for (i in 46:50){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b9",i-45)))
+}
+
+for (i in 51:55){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b10",i-50)))
+}
+
+for (i in 56:60){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b11",i-55)))
+}
+
+plot(density(model1.sim$sims.matrix[,61]), main = paste(c("Density plot for deviance")))
+
+##---------------------------------------------------------------------
+## Trace Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+for (i in 1:5){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b0",i)))
+}
+
+for (i in 6:10){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b1",i-5)))
+}
+
+for (i in 11:15){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b2",i-10)))
+}
+
+for (i in 16:20){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b3",i-15)))
+}
+
+for (i in 21:25){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b4",i-20)))
+}
+
+for (i in 26:30){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b5",i-25)))
+}
+
+for (i in 31:35){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b6",i-30)))
+}
+
+for (i in 36:40){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b7",i-35)))
+}
+
+for (i in 41:45){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b8",i-40)))
+}
+
+for (i in 46:50){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b9",i-45)))
+}
+
+for (i in 51:55){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b10",i-50)))
+}
+
+for (i in 56:60){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b11",i-55)))
+}
+
+plot(model1.sim$sims.matrix[,61], type = "l", main = paste(c("Trace plot for deviance")))
+
+
+##---------------------------------------------------------------------
+## Autocorrelation Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+for (i in 1:5){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b0",i)))
+}
+
+for (i in 6:10){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b1",i-5)))
+}
+
+for (i in 11:15){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b2",i-10)))
+}
+
+for (i in 16:20){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b3",i-15)))
+}
+
+for (i in 21:25){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b4",i-20)))
+}
+
+for (i in 26:30){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b5",i-25)))
+}
+
+for (i in 31:35){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b6",i-30)))
+}
+
+for (i in 36:40){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b7",i-35)))
+}
+
+for (i in 41:45){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b8",i-40)))
+}
+
+for (i in 46:50){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b9",i-45)))
+}
+
+for (i in 51:55){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b10",i-50)))
+}
+
+for (i in 56:60){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b11",i-55)))
+}
+
+acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for deviance")))
+
+
+#-------------------------------------------------------------------------------
+## For the JAGS program (3chains).
+# traceplot(mod1)
+# densityplot(mod1)
+# autocorr.diag(mod1$samples)
+# autocorr.plot(mod1$samples)
+
+
+######################################################################
+# Variable Selection using BAS.
+#=====================================================================
+# install.packages("BAS")
+library(BAS)
+
+#==================================================
+# Preparing our data before running BAS
+#==================================================
+# We will separate the multinomial problem
+# into 5 binomial logistic regresions, in
+# order to use the package BAS.
+# Our reference category will be 6.
+#-----------------------------------------
+
+## Seperate our categories and make the response a binomial.
+## E.g: Category 6 = 0 (baseline), Category 1 = 1
+
+## For category 1, with reference level 6.
+category1.6 <- wines.bas[wines.bas[,12]==1|wines.bas[,12]==6,]
+category1.6[category1.6[,12]==6,12] <- 0
+
+## For category 2, with reference level 6.
+category2.6 <- wines.bas[wines.bas[,12]==2|wines.bas[,12]==6,]
+category2.6[category2.6[,12]==6,12] <- 0
+category2.6[category2.6[,12]==2,12] <- 1
+
+## For category 3, with reference level 6.
+category3.6 <- wines.bas[wines.bas[,12]==3|wines.bas[,12]==6,]
+category3.6[category3.6[,12]==6,12] <- 0
+category3.6[category3.6[,12]==3,12] <- 1
+
+## For category 4, with reference level 6.
+category4.6 <- wines.bas[wines.bas[,12]==4|wines.bas[,12]==6,]
+category4.6[category4.6[,12]==6,12] <- 0
+category4.6[category4.6[,12]==4,12] <- 1
+
+## For category 5, with reference level 6.
+category5.6 <- wines.bas[wines.bas[,12]==5|wines.bas[,12]==6,]
+category5.6[category5.6[,12]==6,12] <- 0
+category5.6[category5.6[,12]==5,12] <- 1
+
+## Check that our datasets have the proper values
+# table(wines.bas$quality)
+# table(category1.6$quality)
+# table(category2.6$quality)
+# table(category3.6$quality)
+# table(category4.6$quality)
+# table(category5.6$quality)
+
+
+#==================================================
+# Variable Selection through g-prior, using BAS
+#==================================================
+## For category 1, with reference level 6.
+##----------------------------------------
+n <- nrow(category1.6)
+
+## Uniform Prior
+res1.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=g.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res1.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=g.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res1.1)
+summary(res1.1)
+
+##----------------------------------------
+## For category 2, with reference level 6.
+##----------------------------------------
+n <- nrow(category2.6)
+
+## Uniform Prior
+res1.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=g.prior(n), modelprior = uniform())
+## Beta-Binomial Prior
+#res1.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=g.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res1.2)
+summary(res1.2)
+
+##----------------------------------------
+## For category 3, with reference level 6.
+##----------------------------------------
+n <- nrow(category3.6)
+
+## Uniform Prior
+res1.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=g.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res1.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=g.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res1.3)
+summary(res1.3)
+
+##----------------------------------------
+## For category 4, with reference level 6.
+##----------------------------------------
+n <- nrow(category4.6)
+
+## Uniform Prior
+res1.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=g.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res1.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=g.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res1.4)
+summary(res1.4)
+
+##----------------------------------------
+## For category 5, with reference level 6.
+##----------------------------------------
+n <- nrow(category5.6)
+
+## Uniform Prior
+res1.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=g.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res1.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=g.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res1.5)
+summary(res1.5)
+
+
+#==================================================
+# Variable Selection through hyper-g, using BAS
+#==================================================
+## Here alpha = 3.
+##----------------------------------------
+## For category 1, with reference level 6.
+##----------------------------------------
+## Uniform Prior
+res2.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=hyper.g(3), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res2.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=hyper.g(3), modelprior = beta.binomial(2,10))
+
+coef(res2.1)
+summary(res2.1)
+
+##----------------------------------------
+## For category 2, with reference level 6.
+##----------------------------------------
+## Uniform Prior
+res2.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=hyper.g(3), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res2.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=hyper.g(3), modelprior = beta.binomial(2,10))
+
+coef(res2.2)
+summary(res2.2)
+
+##----------------------------------------
+## For category 3, with reference level 6.
+##----------------------------------------
+## Uniform Prior
+res2.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=hyper.g(3), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res2.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=hyper.g(3), modelprior = beta.binomial(2,10))
+
+coef(res2.3)
+summary(res2.3)
+
+##----------------------------------------
+## For category 4, with reference level 6.
+##----------------------------------------
+## Uniform Prior
+res2.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=hyper.g(3), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res2.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=hyper.g(3), modelprior = beta.binomial(2,10))
+
+coef(res2.4)
+summary(res2.4)
+
+##----------------------------------------
+## For category 5, with reference level 6.
+##----------------------------------------
+## Uniform Prior
+res2.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=hyper.g(3), modelprior = uniform())
+
+## Beta-Binomial Prior
+#res2.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=hyper.g(3), modelprior = beta.binomial(2,10))
+
+coef(res2.5)
+summary(res2.5)
+
+
+#==================================================
+# Variable Selection through hyper-g/n, using BAS
+#==================================================
+## Here we choose alpha = 3.
+##----------------------------------------
+## For category 1, with reference level 6.
+##----------------------------------------
+#n <- nrow(category1.6)
+#
+### Uniform Prior
+##res3.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=hyper.g.n(3,n), modelprior = uniform())
+#
+### Beta-Binomial Prior
+#res3.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=hyper.g.n(3,n), modelprior = beta.binomial(2,10))
+#
+#coef(res3.1)
+#summary(res3.1)
+
+##----------------------------------------
+## For category 2, with reference level 6.
+##----------------------------------------
+#n <- nrow(category2.6)
+#
+### Uniform Prior
+##res3.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=hyper.g.n(3,n), modelprior = uniform())
+#
+### Beta-Binomial Prior
+#res3.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=hyper.g.n(3,n), modelprior = beta.binomial(2,10))
+#
+#coef(res3.2)
+#summary(res3.2)
+
+##----------------------------------------
+## For category 3, with reference level 6.
+##----------------------------------------
+#n <- nrow(category3.6)
+#
+### Uniform Prior
+##res3.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=hyper.g.n(3,n), modelprior = uniform())
+#
+### Beta-Binomial Prior
+#res3.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=hyper.g.n(3,n), modelprior = beta.binomial(2,10))
+#
+#coef(res3.3)
+#summary(res3.3)
+
+##----------------------------------------
+## For category 4, with reference level 6.
+##----------------------------------------
+#n <- nrow(category4.6)
+#
+### Uniform Prior
+##res3.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=hyper.g.n(3,n), modelprior = uniform())
+#
+### Beta-Binomial Prior
+#res3.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=hyper.g.n(3,n), modelprior = beta.binomial(2,10))
+#
+#coef(res3.4)
+#summary(res3.4)
+
+## For category 5, with reference level 6.
+#n <- nrow(category5.6)
+#
+### Uniform Prior
+##res3.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=hyper.g.n(3,n), modelprior = uniform())
+#
+### Beta-Binomial Prior
+#res3.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=hyper.g.n(3,n), modelprior = beta.binomial(2,10))
+#
+#coef(res3.5)
+#summary(res3.5)
+
+
+#==================================================
+# Variable Selection through BIC, using BAS
+#==================================================
+## For category 1, with reference level 6.
+##----------------------------------------
+n <- nrow(category1.6)
+
+## Uniform Prior
+#res4.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=bic.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+res4.1 <- bas.glm(quality~., family='binomial', data=category1.6, betaprior=bic.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res4.1)
+summary(res4.1)
+
+##----------------------------------------
+## For category 2, with reference level 6.
+##----------------------------------------
+n <- nrow(category2.6)
+
+## Uniform Prior
+#res4.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=bic.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+res4.2 <- bas.glm(quality~., family='binomial', data=category2.6, betaprior=bic.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res4.2)
+summary(res4.2)
+
+##----------------------------------------
+## For category 3, with reference level 6.
+##----------------------------------------
+n <- nrow(category3.6)
+
+## Uniform Prior
+#res4.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=bic.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+res4.3 <- bas.glm(quality~., family='binomial', data=category3.6, betaprior=bic.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res4.3)
+summary(res4.3)
+
+##----------------------------------------
+## For category 4, with reference level 6.
+##----------------------------------------
+n <- nrow(category4.6)
+
+## Uniform Prior
+#res4.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=bic.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+res4.4 <- bas.glm(quality~., family='binomial', data=category4.6, betaprior=bic.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res4.4)
+summary(res4.4)
+
+##----------------------------------------
+## For category 5, with reference level 6.
+##----------------------------------------
+n <- nrow(category5.6)
+
+## Uniform Prior
+#res4.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=bic.prior(n), modelprior = uniform())
+
+## Beta-Binomial Prior
+res4.5 <- bas.glm(quality~., family='binomial', data=category5.6, betaprior=bic.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res4.5)
+summary(res4.5)
+
+
+######################################################################
+# Variable Selection using OpenBUGS.
+#=====================================================================
+# Preparing our data to run the Empirical Bayes model in OpenBUGS.
+#=====================================================================
+## Load libraries.
+library(R2WinBUGS)
+library(BRugs)
+
+## Set the directory.
+openbugs.dir <- "D:\\OpenBUGS323"
+
+## Posterior Mean Estimates
+prop.mean.beta0 <- c(-10, -3, 0.2, -2, -6.6)
+prop.mean.beta1 <- c(1.1, 1, 0.2, 0.7, -0.5)
+prop.mean.beta2 <- c(1.8, 0.5, -0.5, -0.8, -0.1)
+prop.mean.beta3 <- c(0.8, 0, -0.3, -0.1, 0.5)
+prop.mean.beta4 <- c(-0.1, 0.6, 0.1, 0.4, 0)
+prop.mean.beta5 <- c(0.7, 0.1, -0.1, -0.5, -1.9)
+prop.mean.beta6 <- c(2, -0.3, 0.2, 0.2, 0.4)
+prop.mean.beta7 <- c(-4.6, -0.5, -0.5, -0.9, -1.7)
+prop.mean.beta8 <- c(0.7, -1.1, -0.1, -0.6, -0.2)
+prop.mean.beta9 <- c(1.9, 0.8, 0, 0.1, -1)
+prop.mean.beta10 <- c(-0.6, 0.1, 0.4, 0.9, 1.2)
+prop.mean.beta11 <- c(-1.6, -0.3, 0.8, 1.4, 2.3)
+
+## Posterior Standard Deviation Estimates
+prop.sd.beta0 <- c(1.7, 0.2, 0.1, 0.2, 0.8)
+prop.sd.beta1 <- c(1.3, 0.5, 0.2, 0.2, 0.7)
+prop.sd.beta2 <- c(0.5, 0.2, 0.1, 0.2, 0.4)
+prop.sd.beta3 <- c(0.9, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta4 <- c(0.5, 0.2, 0.1, 0.1, 0.4)
+prop.sd.beta5 <- c(0.4, 0.2, 0.1, 0.2, 0.7)
+prop.sd.beta6 <- c(1.1, 0.3, 0.1, 0.1, 0.4)
+prop.sd.beta7 <- c(1.9, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta8 <- c(1.1, 0.4, 0.2, 0.2, 0.6)
+prop.sd.beta9 <- c(0.8, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta10 <- c(0.7, 0.2, 0.1, 0.1, 0.3)
+prop.sd.beta11 <- c(1, 0.3, 0.1, 0.2, 0.5)
+
+
+## A new list for our data.
+lwines1 <- list(y=y, x=wines1[,1:11], prop.mean.beta0=prop.mean.beta0,
+           prop.mean.beta1=prop.mean.beta1, prop.mean.beta2=prop.mean.beta2,
+           prop.mean.beta3=prop.mean.beta3, prop.mean.beta4=prop.mean.beta4,
+           prop.mean.beta5=prop.mean.beta5, prop.mean.beta6=prop.mean.beta6,
+           prop.mean.beta7=prop.mean.beta7, prop.mean.beta8=prop.mean.beta8,
+           prop.mean.beta9=prop.mean.beta9, prop.mean.beta10=prop.mean.beta10,
+           prop.mean.beta11=prop.mean.beta11,
+           prop.sd.beta0=prop.sd.beta0, prop.sd.beta1=prop.sd.beta1,
+           prop.sd.beta2=prop.sd.beta2, prop.sd.beta3=prop.sd.beta3,
+           prop.sd.beta4=prop.sd.beta4, prop.sd.beta5=prop.sd.beta5,
+           prop.sd.beta6=prop.sd.beta6, prop.sd.beta7=prop.sd.beta7,
+           prop.sd.beta8=prop.sd.beta8, prop.sd.beta9=prop.sd.beta9,
+           prop.sd.beta10=prop.sd.beta10, prop.sd.beta11=prop.sd.beta11)
+
+## A list of initials (one chain).
+inits2 <- list(  
+	list(b0=rep(0, times=5), b1=rep(0, times=5), b2=rep(0, times=5), 
+             b3=rep(0, times=5), b4=rep(0, times=5), b5=rep(0, times=5), 
+             b6=rep(0, times=5), b7=rep(0, times=5), b8=rep(0, times=5), 
+             b9=rep(0, times=5), b10=rep(0, times=5), 
+             b11=rep(0, times=5), 
+             gamma1=rep(0, times=5),
+             gamma2=rep(0, times=5), gamma3=rep(0, times=5),
+             gamma4=rep(0, times=5), gamma5=rep(0, times=5),
+             gamma6=rep(0, times=5), gamma7=rep(0, times=5),
+             gamma8=rep(0, times=5), gamma9=rep(0, times=5),
+             gamma10=rep(0, times=5), gamma11=rep(0, times=5)#,
+#            p1=0.5, p2=0.5, p3=0.5, p4=0.5, p5=0.5, p6=0.5,
+#            p7=0.5, p8=0.5, p9=0.5, p10=0.5, p11=0.5
+             ) )
+
+## The parameters of interest.
+parameter.names1 <- c( 'gb0', 'gb1', 'gb2', 'gb3', 'gb4', 'gb5', 'gb6', 'gb7', 'gb8', 'gb9', 'gb10', 'gb11') 
+
+## The model for the empirical Bayes method (in OpenBUGS). (WARNING!!! Run time ~ 3:30 hours)
+model2.sim <- bugs( lwines1, inits2, model.file = "C:\\Users\\30697\\Desktop\\empirical.txt", parameters = parameter.names1,
+         n.chains = 1, n.iter = 11000, n.burnin=1000, n.thin=30,  bugs.directory = openbugs.dir, debug=F, program="OpenBUGS")
+
+##---------------------------------------------------------------------
+## Density Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+for (i in 1:5){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b0",i)))
+}
+
+for (i in 6:10){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b1",i-5)))
+}
+
+for (i in 11:15){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b2",i-10)))
+}
+
+for (i in 16:20){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b3",i-15)))
+}
+
+for (i in 21:25){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b4",i-20)))
+}
+
+for (i in 26:30){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b5",i-25)))
+}
+
+for (i in 31:35){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b6",i-30)))
+}
+
+for (i in 36:40){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b7",i-35)))
+}
+
+for (i in 41:45){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b8",i-40)))
+}
+
+for (i in 46:50){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b9",i-45)))
+}
+
+for (i in 51:55){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b10",i-50)))
+}
+
+for (i in 56:60){
+   plot(density(model2.sim$sims.matrix[,i]), main = paste(c("Density plot for b11",i-55)))
+}
+
+plot(density(model2.sim$sims.matrix[,61]), main = paste(c("Density plot for deviance")))
+
+
+#============================================================================
+# Preparing our data to run the g-prior (of Liang et al.) model in OpenBUGS.
+#============================================================================
+## Load libraries.
+library(R2WinBUGS)
+library(BRugs)
+
+## Set the directory.
+openbugs.dir <- "D:\\OpenBUGS323"
+
+## Posterior Mean Estimates
+prop.mean.beta1 <- c(1.1, 1, 0.2, 0.7, -0.5)
+prop.mean.beta2 <- c(1.8, 0.5, -0.5, -0.8, -0.1)
+prop.mean.beta3 <- c(0.8, 0, -0.3, -0.1, 0.5)
+prop.mean.beta4 <- c(-0.1, 0.6, 0.1, 0.4, 0)
+prop.mean.beta5 <- c(0.7, 0.1, -0.1, -0.5, -1.9)
+prop.mean.beta6 <- c(2, -0.3, 0.2, 0.2, 0.4)
+prop.mean.beta7 <- c(-4.6, -0.5, -0.5, -0.9, -1.7)
+prop.mean.beta8 <- c(0.7, -1.1, -0.1, -0.6, -0.2)
+prop.mean.beta9 <- c(1.9, 0.8, 0, 0.1, -1)
+prop.mean.beta10 <- c(-0.6, 0.1, 0.4, 0.9, 1.2)
+prop.mean.beta11 <- c(-1.6, -0.3, 0.8, 1.4, 2.3)
+
+## Posterior Standard Deviation Estimates
+prop.sd.beta1 <- c(1.3, 0.5, 0.2, 0.2, 0.7)
+prop.sd.beta2 <- c(0.5, 0.2, 0.1, 0.2, 0.4)
+prop.sd.beta3 <- c(0.9, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta4 <- c(0.5, 0.2, 0.1, 0.1, 0.4)
+prop.sd.beta5 <- c(0.4, 0.2, 0.1, 0.2, 0.7)
+prop.sd.beta6 <- c(1.1, 0.3, 0.1, 0.1, 0.4)
+prop.sd.beta7 <- c(1.9, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta8 <- c(1.1, 0.4, 0.2, 0.2, 0.6)
+prop.sd.beta9 <- c(0.8, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta10 <- c(0.7, 0.2, 0.1, 0.1, 0.3)
+prop.sd.beta11 <- c(1, 0.3, 0.1, 0.2, 0.5)
+
+## The wines data are already centered, so
+## here we only calculate the XTX matrix
+XTX <- t(wines1)%*%wines1
+
+## A new list for our data.
+lwines2 <- list(y=y, XTX=XTX, x=wines1[,1:11],
+           prop.mean.beta1=prop.mean.beta1, prop.mean.beta2=prop.mean.beta2,
+           prop.mean.beta3=prop.mean.beta3, prop.mean.beta4=prop.mean.beta4,
+           prop.mean.beta5=prop.mean.beta5, prop.mean.beta6=prop.mean.beta6,
+           prop.mean.beta7=prop.mean.beta7, prop.mean.beta8=prop.mean.beta8,
+           prop.mean.beta9=prop.mean.beta9, prop.mean.beta10=prop.mean.beta10,
+           prop.mean.beta11=prop.mean.beta11,
+           prop.sd.beta1=prop.sd.beta1,
+           prop.sd.beta2=prop.sd.beta2, prop.sd.beta3=prop.sd.beta3,
+           prop.sd.beta4=prop.sd.beta4, prop.sd.beta5=prop.sd.beta5,
+           prop.sd.beta6=prop.sd.beta6, prop.sd.beta7=prop.sd.beta7,
+           prop.sd.beta8=prop.sd.beta8, prop.sd.beta9=prop.sd.beta9,
+           prop.sd.beta10=prop.sd.beta10, prop.sd.beta11=prop.sd.beta11)
+
+## A list of initials (one chain).
+inits3 <- list(  
+	list(alpha=rep(0.6, times=5), B1=rep(0, times=5), B2=rep(0, times=5), 
+             B3=rep(0, times=5), B4=rep(0, times=5), B5=rep(0, times=5), 
+             B6=rep(0, times=5), B7=rep(0, times=5), B8=rep(0, times=5), 
+             B9=rep(0, times=5), B10=rep(0, times=5), 
+             B11=rep(0, times=5), logtau=0,
+             gamma1=rep(0, times=5),
+             gamma2=rep(0, times=5), gamma3=rep(0, times=5),
+             gamma4=rep(0, times=5), gamma5=rep(0, times=5),
+             gamma6=rep(0, times=5), gamma7=rep(0, times=5),
+             gamma8=rep(0, times=5), gamma9=rep(0, times=5),
+             gamma10=rep(0, times=5), gamma11=rep(0, times=5)#,
+#            p1=0.5, p2=0.5, p3=0.5, p4=0.5, p5=0.5, p6=0.5,
+#            p7=0.5, p8=0.5, p9=0.5, p10=0.5, p11=0.5
+             ) )
+
+## The parameters of interest.
+parameter.names2 <- c( 'alpha', 'gb1', 'gb2', 'gb3', 'gb4', 'gb5', 'gb6', 'gb7', 'gb8', 'gb9', 'gb10', 'gb11') 
+
+## The model for the gprior method (in OpenBUGS). (WARNING!!! Run time ~ 13 hours)
+model3.sim <- bugs( lwines2, inits3, model.file = "C:\\Users\\30697\\Desktop\\gprior.txt", parameters = parameter.names2,
+         n.chains = 1, n.iter = 11000, n.burnin=1000, n.thin=30,  bugs.directory = openbugs.dir, debug=F, program="OpenBUGS")
+
+##---------------------------------------------------------------------
+## Density Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+for (i in 1:5){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b0",i)))
+}
+
+for (i in 6:10){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b1",i-5)))
+}
+
+for (i in 11:15){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b2",i-10)))
+}
+
+for (i in 16:20){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b3",i-15)))
+}
+
+for (i in 21:25){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b4",i-20)))
+}
+
+for (i in 26:30){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b5",i-25)))
+}
+
+for (i in 31:35){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b6",i-30)))
+}
+
+for (i in 36:40){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b7",i-35)))
+}
+
+for (i in 41:45){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b8",i-40)))
+}
+
+for (i in 46:50){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b9",i-45)))
+}
+
+for (i in 51:55){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b10",i-50)))
+}
+
+for (i in 56:60){
+   plot(density(model3.sim$sims.matrix[,i]), main = paste(c("Density plot for b11",i-55)))
+}
+
+plot(density(model3.sim$sims.matrix[,61]), main = paste(c("Density plot for deviance")))
+
+
+#============================================================================
+# Preparing our data to run the hyper-g (of Liang et al.) model in OpenBUGS.
+#============================================================================
+## Load libraries.
+library(R2WinBUGS)
+library(BRugs)
+
+## Set the directory.
+openbugs.dir <- "D:\\OpenBUGS323"
+
+## Posterior Mean Estimates
+prop.mean.beta1 <- c(1.1, 1, 0.2, 0.7, -0.5)
+prop.mean.beta2 <- c(1.8, 0.5, -0.5, -0.8, -0.1)
+prop.mean.beta3 <- c(0.8, 0, -0.3, -0.1, 0.5)
+prop.mean.beta4 <- c(-0.1, 0.6, 0.1, 0.4, 0)
+prop.mean.beta5 <- c(0.7, 0.1, -0.1, -0.5, -1.9)
+prop.mean.beta6 <- c(2, -0.3, 0.2, 0.2, 0.4)
+prop.mean.beta7 <- c(-4.6, -0.5, -0.5, -0.9, -1.7)
+prop.mean.beta8 <- c(0.7, -1.1, -0.1, -0.6, -0.2)
+prop.mean.beta9 <- c(1.9, 0.8, 0, 0.1, -1)
+prop.mean.beta10 <- c(-0.6, 0.1, 0.4, 0.9, 1.2)
+prop.mean.beta11 <- c(-1.6, -0.3, 0.8, 1.4, 2.3)
+
+## Posterior Standard Deviation Estimates
+prop.sd.beta1 <- c(1.3, 0.5, 0.2, 0.2, 0.7)
+prop.sd.beta2 <- c(0.5, 0.2, 0.1, 0.2, 0.4)
+prop.sd.beta3 <- c(0.9, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta4 <- c(0.5, 0.2, 0.1, 0.1, 0.4)
+prop.sd.beta5 <- c(0.4, 0.2, 0.1, 0.2, 0.7)
+prop.sd.beta6 <- c(1.1, 0.3, 0.1, 0.1, 0.4)
+prop.sd.beta7 <- c(1.9, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta8 <- c(1.1, 0.4, 0.2, 0.2, 0.6)
+prop.sd.beta9 <- c(0.8, 0.3, 0.1, 0.2, 0.5)
+prop.sd.beta10 <- c(0.7, 0.2, 0.1, 0.1, 0.3)
+prop.sd.beta11 <- c(1, 0.3, 0.1, 0.2, 0.5)
+
+## The wines data are already centered, so
+## here we only calculate the XTX matrix
+XTX <- t(wines1)%*%wines1
+
+## A new list for our data.
+lwines2 <- list(y=y, XTX=XTX, x=wines1[,1:11],
+           prop.mean.beta1=prop.mean.beta1, prop.mean.beta2=prop.mean.beta2,
+           prop.mean.beta3=prop.mean.beta3, prop.mean.beta4=prop.mean.beta4,
+           prop.mean.beta5=prop.mean.beta5, prop.mean.beta6=prop.mean.beta6,
+           prop.mean.beta7=prop.mean.beta7, prop.mean.beta8=prop.mean.beta8,
+           prop.mean.beta9=prop.mean.beta9, prop.mean.beta10=prop.mean.beta10,
+           prop.mean.beta11=prop.mean.beta11,
+           prop.sd.beta1=prop.sd.beta1,
+           prop.sd.beta2=prop.sd.beta2, prop.sd.beta3=prop.sd.beta3,
+           prop.sd.beta4=prop.sd.beta4, prop.sd.beta5=prop.sd.beta5,
+           prop.sd.beta6=prop.sd.beta6, prop.sd.beta7=prop.sd.beta7,
+           prop.sd.beta8=prop.sd.beta8, prop.sd.beta9=prop.sd.beta9,
+           prop.sd.beta10=prop.sd.beta10, prop.sd.beta11=prop.sd.beta11)
+
+## A list of initials (one chain).
+inits4 <- list(  
+	list(alpha=rep(0.6, times=5), B1=rep(0, times=5), B2=rep(0, times=5), 
+             B3=rep(0, times=5), B4=rep(0, times=5), B5=rep(0, times=5), 
+             B6=rep(0, times=5), B7=rep(0, times=5), B8=rep(0, times=5), 
+             B9=rep(0, times=5), B10=rep(0, times=5), 
+             B11=rep(0, times=5), logtau=0, w=0.7,
+             gamma1=rep(0, times=5),
+             gamma2=rep(0, times=5), gamma3=rep(0, times=5),
+             gamma4=rep(0, times=5), gamma5=rep(0, times=5),
+             gamma6=rep(0, times=5), gamma7=rep(0, times=5),
+             gamma8=rep(0, times=5), gamma9=rep(0, times=5),
+             gamma10=rep(0, times=5), gamma11=rep(0, times=5)#,
+#            p1=0.5, p2=0.5, p3=0.5, p4=0.5, p5=0.5, p6=0.5,
+#            p7=0.5, p8=0.5, p9=0.5, p10=0.5, p11=0.5
+             ) )
+
+## The parameters of interest.
+parameter.names2 <- c( 'alpha', 'gb1', 'gb2', 'gb3', 'gb4', 'gb5', 'gb6', 'gb7', 'gb8', 'gb9', 'gb10', 'gb11') 
+
+## The model for the gprior method (in OpenBUGS). (WARNING!!! Run time ~ 13 hours)
+model4.sim <- bugs( lwines2, inits4, model.file = "C:\\Users\\30697\\Desktop\\hyperg.txt", parameters = parameter.names2,
+         n.chains = 1, n.iter = 11000, n.burnin=1000, n.thin=30,  bugs.directory = openbugs.dir, debug=F, program="OpenBUGS")
+
+##---------------------------------------------------------------------
+## Density Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+for (i in 1:5){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b0",i)))
+}
+
+for (i in 6:10){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b1",i-5)))
+}
+
+for (i in 11:15){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b2",i-10)))
+}
+
+for (i in 16:20){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b3",i-15)))
+}
+
+for (i in 21:25){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b4",i-20)))
+}
+
+for (i in 26:30){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b5",i-25)))
+}
+
+for (i in 31:35){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b6",i-30)))
+}
+
+for (i in 36:40){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b7",i-35)))
+}
+
+for (i in 41:45){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b8",i-40)))
+}
+
+for (i in 46:50){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b9",i-45)))
+}
+
+for (i in 51:55){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b10",i-50)))
+}
+
+for (i in 56:60){
+   plot(density(model4.sim$sims.matrix[,i]), main = paste(c("Density plot for b11",i-55)))
+}
+
+plot(density(model4.sim$sims.matrix[,61]), main = paste(c("Density plot for deviance")))
+
+
+######################################################################
+# Run our simpler Model in R.
+#=====================================================================
+
+## Load libraries.
+library(R2WinBUGS)
+library(BRugs)
+
+## Set the directory.
+openbugs.dir <- "D:\\OpenBUGS323"
+
+## A list of initials (one chain).
+inits5 <- list(  
+	list(b01=0, b02=0, b03=0, b04=0, b05=0, b11=0, b14=0, b15=0, 
+             b21=0, b22=0, b23=0, b24=0, b35=0, b42=0, b44=0, b45=0, 
+             b51=0, b53=0, b54=0, b55=0, b61=0, b63=0, b64=0, b65=0, 
+             b71=0, b72=0, b73=0, b74=0, b75=0, b84=0, b91=0, b92=0, 
+             b95=0, b103=0, b104=0, b105=0, b111=0, b113=0, b114=0, 
+             b115=0) )
+
+## The parameters of interest.
+parameter.names3 <- c( 'b01', 'b02', 'b03', 'b04', 'b05', 'b11', 
+                       'b14', 'b15', 'b21', 'b22', 'b23', 'b24', 
+                       'b35', 'b42', 'b44', 'b45', 'b51', 'b53', 
+                       'b54', 'b55', 'b61', 'b63', 'b64', 'b65', 
+                       'b71', 'b72', 'b73', 'b74', 'b75', 'b84', 
+                       'b91', 'b92', 'b95', 'b103', 'b104', 
+                       'b105', 'b111', 'b113', 'b114', 'b115',
+                       'B01', 'B02', 'B03', 'B04', 'B05', 'B11', 
+                       'B14', 'B15', 'B21', 'B22', 'B23', 'B24', 
+                       'B35', 'B42', 'B44', 'B45', 'B51', 'B53',
+                       'B54', 'B55', 'B61', 'B63', 'B64', 'B65',
+                       'B71', 'B72', 'B73', 'B74', 'B75', 'B84',
+                       'B91', 'B92', 'B95', 'B103', 'B104',
+                       'B105', 'B111', 'B113', 'B114', 'B115') 
+
+## The model (in OpenBUGS). (Run time for 1 chain ~ 50 minutes)
+model5.sim <- bugs( lwines, inits5, model.file = "C:\\Users\\30697\\Desktop\\multinomial2.txt", parameters = parameter.names3,
+         n.chains = 1, n.iter = 51000, n.burnin=1000, n.thin=50,  bugs.directory = openbugs.dir, debug=F, program="OpenBUGS")
+
+######################################################################
+# Check for convergence using plots and CODA
+#=====================================================================
+
+library(coda)
+temp<-as.mcmc.list(model5.sim)
+summary(temp)
+summary(temp)$statistics[,"Naive SE"]
+summary(temp)$statistics[,"Time-series SE"]
+batchSE(temp) 
+effectiveSize(temp)
+
+## 1000 samples (iterations) & 1 chain allow for the following tests:
+geweke.diag(temp)
+heidel.diag(temp)
+
+##---------------------------------------------------------------------
+## Ergodic Plots for betas.
+##---------------------------------------------------------------------
+par(mfrow=c(3,3)) # 9 plots per picture
+
+plot(cumsum(model5.sim$sims.matrix[,1])/1:length(model5.sim$sims.matrix[,1]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b01")))
+plot(cumsum(model5.sim$sims.matrix[,2])/1:length(model5.sim$sims.matrix[,2]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b02")))
+plot(cumsum(model5.sim$sims.matrix[,3])/1:length(model5.sim$sims.matrix[,3]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b03")))
+plot(cumsum(model5.sim$sims.matrix[,4])/1:length(model5.sim$sims.matrix[,4]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b04")))
+plot(cumsum(model5.sim$sims.matrix[,5])/1:length(model5.sim$sims.matrix[,5]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b05")))
+plot(cumsum(model5.sim$sims.matrix[,6])/1:length(model5.sim$sims.matrix[,6]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b11")))
+plot(cumsum(model5.sim$sims.matrix[,7])/1:length(model5.sim$sims.matrix[,7]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b14")))
+plot(cumsum(model5.sim$sims.matrix[,8])/1:length(model5.sim$sims.matrix[,8]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b15")))
+plot(cumsum(model5.sim$sims.matrix[,9])/1:length(model5.sim$sims.matrix[,9]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b21")))
+plot(cumsum(model5.sim$sims.matrix[,10])/1:length(model5.sim$sims.matrix[,10]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b22")))
+plot(cumsum(model5.sim$sims.matrix[,11])/1:length(model5.sim$sims.matrix[,11]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b23")))
+plot(cumsum(model5.sim$sims.matrix[,12])/1:length(model5.sim$sims.matrix[,12]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b24")))
+plot(cumsum(model5.sim$sims.matrix[,13])/1:length(model5.sim$sims.matrix[,13]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b35")))
+plot(cumsum(model5.sim$sims.matrix[,14])/1:length(model5.sim$sims.matrix[,14]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b42")))
+plot(cumsum(model5.sim$sims.matrix[,15])/1:length(model5.sim$sims.matrix[,15]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b44")))
+plot(cumsum(model5.sim$sims.matrix[,16])/1:length(model5.sim$sims.matrix[,16]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b45")))
+plot(cumsum(model5.sim$sims.matrix[,17])/1:length(model5.sim$sims.matrix[,17]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b51")))
+plot(cumsum(model5.sim$sims.matrix[,18])/1:length(model5.sim$sims.matrix[,18]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b53")))
+plot(cumsum(model5.sim$sims.matrix[,19])/1:length(model5.sim$sims.matrix[,19]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b54")))
+plot(cumsum(model5.sim$sims.matrix[,20])/1:length(model5.sim$sims.matrix[,20]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b55")))
+plot(cumsum(model5.sim$sims.matrix[,21])/1:length(model5.sim$sims.matrix[,21]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b61")))
+plot(cumsum(model5.sim$sims.matrix[,22])/1:length(model5.sim$sims.matrix[,22]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b63")))
+plot(cumsum(model5.sim$sims.matrix[,23])/1:length(model5.sim$sims.matrix[,23]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b64")))
+plot(cumsum(model5.sim$sims.matrix[,24])/1:length(model5.sim$sims.matrix[,24]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b65")))
+plot(cumsum(model5.sim$sims.matrix[,25])/1:length(model5.sim$sims.matrix[,25]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b71")))
+plot(cumsum(model5.sim$sims.matrix[,26])/1:length(model5.sim$sims.matrix[,26]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b72")))
+plot(cumsum(model5.sim$sims.matrix[,27])/1:length(model5.sim$sims.matrix[,27]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b73")))
+plot(cumsum(model5.sim$sims.matrix[,28])/1:length(model5.sim$sims.matrix[,28]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b74")))
+plot(cumsum(model5.sim$sims.matrix[,29])/1:length(model5.sim$sims.matrix[,29]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b75")))
+plot(cumsum(model5.sim$sims.matrix[,30])/1:length(model5.sim$sims.matrix[,30]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b84")))
+plot(cumsum(model5.sim$sims.matrix[,31])/1:length(model5.sim$sims.matrix[,31]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b91")))
+plot(cumsum(model5.sim$sims.matrix[,32])/1:length(model5.sim$sims.matrix[,32]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b92")))
+plot(cumsum(model5.sim$sims.matrix[,33])/1:length(model5.sim$sims.matrix[,33]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b95")))
+plot(cumsum(model5.sim$sims.matrix[,34])/1:length(model5.sim$sims.matrix[,34]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b103")))
+plot(cumsum(model5.sim$sims.matrix[,35])/1:length(model5.sim$sims.matrix[,35]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b104")))
+plot(cumsum(model5.sim$sims.matrix[,36])/1:length(model5.sim$sims.matrix[,36]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b105")))
+plot(cumsum(model5.sim$sims.matrix[,37])/1:length(model5.sim$sims.matrix[,37]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b111")))
+plot(cumsum(model5.sim$sims.matrix[,38])/1:length(model5.sim$sims.matrix[,38]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b113")))
+plot(cumsum(model5.sim$sims.matrix[,39])/1:length(model5.sim$sims.matrix[,39]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b114")))
+plot(cumsum(model5.sim$sims.matrix[,40])/1:length(model5.sim$sims.matrix[,40]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b115")))
+plot(cumsum(model5.sim$sims.matrix[,81])/1:length(model5.sim$sims.matrix[,81]), 
+type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for deviance")))
+
+
+##---------------------------------------------------------------------
+## Density Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+plot(density(model5.sim$sims.matrix[,1]), main = paste(c("Density plot for b01")))
+plot(density(model5.sim$sims.matrix[,2]), main = paste(c("Density plot for b02")))
+plot(density(model5.sim$sims.matrix[,3]), main = paste(c("Density plot for b03")))
+plot(density(model5.sim$sims.matrix[,4]), main = paste(c("Density plot for b04")))
+plot(density(model5.sim$sims.matrix[,5]), main = paste(c("Density plot for b05")))
+plot(density(model5.sim$sims.matrix[,6]), main = paste(c("Density plot for b11")))
+plot(density(model5.sim$sims.matrix[,7]), main = paste(c("Density plot for b14")))
+plot(density(model5.sim$sims.matrix[,8]), main = paste(c("Density plot for b15")))
+plot(density(model5.sim$sims.matrix[,9]), main = paste(c("Density plot for b21")))
+plot(density(model5.sim$sims.matrix[,10]), main = paste(c("Density plot for b22")))
+plot(density(model5.sim$sims.matrix[,11]), main = paste(c("Density plot for b23")))
+plot(density(model5.sim$sims.matrix[,12]), main = paste(c("Density plot for b24")))
+plot(density(model5.sim$sims.matrix[,13]), main = paste(c("Density plot for b35")))
+plot(density(model5.sim$sims.matrix[,14]), main = paste(c("Density plot for b42")))
+plot(density(model5.sim$sims.matrix[,15]), main = paste(c("Density plot for b44")))
+plot(density(model5.sim$sims.matrix[,16]), main = paste(c("Density plot for b45")))
+plot(density(model5.sim$sims.matrix[,17]), main = paste(c("Density plot for b51")))
+plot(density(model5.sim$sims.matrix[,18]), main = paste(c("Density plot for b53")))
+plot(density(model5.sim$sims.matrix[,19]), main = paste(c("Density plot for b54")))
+plot(density(model5.sim$sims.matrix[,20]), main = paste(c("Density plot for b55")))
+plot(density(model5.sim$sims.matrix[,21]), main = paste(c("Density plot for b61")))
+plot(density(model5.sim$sims.matrix[,22]), main = paste(c("Density plot for b63")))
+plot(density(model5.sim$sims.matrix[,23]), main = paste(c("Density plot for b64")))
+plot(density(model5.sim$sims.matrix[,24]), main = paste(c("Density plot for b65")))
+plot(density(model5.sim$sims.matrix[,25]), main = paste(c("Density plot for b71")))
+plot(density(model5.sim$sims.matrix[,26]), main = paste(c("Density plot for b72")))
+plot(density(model5.sim$sims.matrix[,27]), main = paste(c("Density plot for b73")))
+plot(density(model5.sim$sims.matrix[,28]), main = paste(c("Density plot for b74")))
+plot(density(model5.sim$sims.matrix[,29]), main = paste(c("Density plot for b75")))
+plot(density(model5.sim$sims.matrix[,30]), main = paste(c("Density plot for b84")))
+plot(density(model5.sim$sims.matrix[,31]), main = paste(c("Density plot for b91")))
+plot(density(model5.sim$sims.matrix[,32]), main = paste(c("Density plot for b92")))
+plot(density(model5.sim$sims.matrix[,33]), main = paste(c("Density plot for b95")))
+plot(density(model5.sim$sims.matrix[,34]), main = paste(c("Density plot for b103")))
+plot(density(model5.sim$sims.matrix[,35]), main = paste(c("Density plot for b104")))
+plot(density(model5.sim$sims.matrix[,36]), main = paste(c("Density plot for b105")))
+plot(density(model5.sim$sims.matrix[,37]), main = paste(c("Density plot for b111")))
+plot(density(model5.sim$sims.matrix[,38]), main = paste(c("Density plot for b113")))
+plot(density(model5.sim$sims.matrix[,39]), main = paste(c("Density plot for b114")))
+plot(density(model5.sim$sims.matrix[,40]), main = paste(c("Density plot for b115")))
+plot(density(model5.sim$sims.matrix[,81]), main = paste(c("Density plot for deviance")))
+
+
+##---------------------------------------------------------------------
+## Trace Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+plot(model5.sim$sims.matrix[,1], type = "l", main = paste(c("Trace plot for b01")))
+plot(model5.sim$sims.matrix[,2], type = "l", main = paste(c("Trace plot for b02")))
+plot(model5.sim$sims.matrix[,3], type = "l", main = paste(c("Trace plot for b03")))
+plot(model5.sim$sims.matrix[,4], type = "l", main = paste(c("Trace plot for b04")))
+plot(model5.sim$sims.matrix[,5], type = "l", main = paste(c("Trace plot for b05")))
+plot(model5.sim$sims.matrix[,6], type = "l", main = paste(c("Trace plot for b11")))
+plot(model5.sim$sims.matrix[,7], type = "l", main = paste(c("Trace plot for b14")))
+plot(model5.sim$sims.matrix[,8], type = "l", main = paste(c("Trace plot for b15")))
+plot(model5.sim$sims.matrix[,9], type = "l", main = paste(c("Trace plot for b21")))
+plot(model5.sim$sims.matrix[,10], type = "l", main = paste(c("Trace plot for b22")))
+plot(model5.sim$sims.matrix[,11], type = "l", main = paste(c("Trace plot for b23")))
+plot(model5.sim$sims.matrix[,12], type = "l", main = paste(c("Trace plot for b24")))
+plot(model5.sim$sims.matrix[,13], type = "l", main = paste(c("Trace plot for b35")))
+plot(model5.sim$sims.matrix[,14], type = "l", main = paste(c("Trace plot for b42")))
+plot(model5.sim$sims.matrix[,15], type = "l", main = paste(c("Trace plot for b44")))
+plot(model5.sim$sims.matrix[,16], type = "l", main = paste(c("Trace plot for b45")))
+plot(model5.sim$sims.matrix[,17], type = "l", main = paste(c("Trace plot for b51")))
+plot(model5.sim$sims.matrix[,18], type = "l", main = paste(c("Trace plot for b53")))
+plot(model5.sim$sims.matrix[,19], type = "l", main = paste(c("Trace plot for b54")))
+plot(model5.sim$sims.matrix[,20], type = "l", main = paste(c("Trace plot for b55")))
+plot(model5.sim$sims.matrix[,21], type = "l", main = paste(c("Trace plot for b61")))
+plot(model5.sim$sims.matrix[,22], type = "l", main = paste(c("Trace plot for b63")))
+plot(model5.sim$sims.matrix[,23], type = "l", main = paste(c("Trace plot for b64")))
+plot(model5.sim$sims.matrix[,24], type = "l", main = paste(c("Trace plot for b65")))
+plot(model5.sim$sims.matrix[,25], type = "l", main = paste(c("Trace plot for b71")))
+plot(model5.sim$sims.matrix[,26], type = "l", main = paste(c("Trace plot for b72")))
+plot(model5.sim$sims.matrix[,27], type = "l", main = paste(c("Trace plot for b73")))
+plot(model5.sim$sims.matrix[,28], type = "l", main = paste(c("Trace plot for b74")))
+plot(model5.sim$sims.matrix[,29], type = "l", main = paste(c("Trace plot for b75")))
+plot(model5.sim$sims.matrix[,30], type = "l", main = paste(c("Trace plot for b84")))
+plot(model5.sim$sims.matrix[,31], type = "l", main = paste(c("Trace plot for b91")))
+plot(model5.sim$sims.matrix[,32], type = "l", main = paste(c("Trace plot for b92")))
+plot(model5.sim$sims.matrix[,33], type = "l", main = paste(c("Trace plot for b95")))
+plot(model5.sim$sims.matrix[,34], type = "l", main = paste(c("Trace plot for b103")))
+plot(model5.sim$sims.matrix[,35], type = "l", main = paste(c("Trace plot for b104")))
+plot(model5.sim$sims.matrix[,36], type = "l", main = paste(c("Trace plot for b105")))
+plot(model5.sim$sims.matrix[,37], type = "l", main = paste(c("Trace plot for b111")))
+plot(model5.sim$sims.matrix[,38], type = "l", main = paste(c("Trace plot for b113")))
+plot(model5.sim$sims.matrix[,39], type = "l", main = paste(c("Trace plot for b114")))
+plot(model5.sim$sims.matrix[,40], type = "l", main = paste(c("Trace plot for b115")))
+plot(model5.sim$sims.matrix[,81], type = "l", main = paste(c("Trace plot for deviance")))
+
+
+##---------------------------------------------------------------------
+## Autocorrelation Plots for betas.
+##---------------------------------------------------------------------
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+
+acf(model5.sim$sims.matrix[,1], main = paste(c("ACF plot for b01")))
+acf(model5.sim$sims.matrix[,2], main = paste(c("ACF plot for b02")))
+acf(model5.sim$sims.matrix[,3], main = paste(c("ACF plot for b03")))
+acf(model5.sim$sims.matrix[,4], main = paste(c("ACF plot for b04")))
+acf(model5.sim$sims.matrix[,5], main = paste(c("ACF plot for b05")))
+acf(model5.sim$sims.matrix[,6], main = paste(c("ACF plot for b11")))
+acf(model5.sim$sims.matrix[,7], main = paste(c("ACF plot for b14")))
+acf(model5.sim$sims.matrix[,8], main = paste(c("ACF plot for b15")))
+acf(model5.sim$sims.matrix[,9], main = paste(c("ACF plot for b21")))
+acf(model5.sim$sims.matrix[,10], main = paste(c("ACF plot for b22")))
+acf(model5.sim$sims.matrix[,11], main = paste(c("ACF plot for b23")))
+acf(model5.sim$sims.matrix[,12], main = paste(c("ACF plot for b24")))
+acf(model5.sim$sims.matrix[,13], main = paste(c("ACF plot for b35")))
+acf(model5.sim$sims.matrix[,14], main = paste(c("ACF plot for b42")))
+acf(model5.sim$sims.matrix[,15], main = paste(c("ACF plot for b44")))
+acf(model5.sim$sims.matrix[,16], main = paste(c("ACF plot for b45")))
+acf(model5.sim$sims.matrix[,17], main = paste(c("ACF plot for b51")))
+acf(model5.sim$sims.matrix[,18], main = paste(c("ACF plot for b53")))
+acf(model5.sim$sims.matrix[,19], main = paste(c("ACF plot for b54")))
+acf(model5.sim$sims.matrix[,20], main = paste(c("ACF plot for b55")))
+acf(model5.sim$sims.matrix[,21], main = paste(c("ACF plot for b61")))
+acf(model5.sim$sims.matrix[,22], main = paste(c("ACF plot for b63")))
+acf(model5.sim$sims.matrix[,23], main = paste(c("ACF plot for b64")))
+acf(model5.sim$sims.matrix[,24], main = paste(c("ACF plot for b65")))
+acf(model5.sim$sims.matrix[,25], main = paste(c("ACF plot for b71")))
+acf(model5.sim$sims.matrix[,26], main = paste(c("ACF plot for b72")))
+acf(model5.sim$sims.matrix[,27], main = paste(c("ACF plot for b73")))
+acf(model5.sim$sims.matrix[,28], main = paste(c("ACF plot for b74")))
+acf(model5.sim$sims.matrix[,29], main = paste(c("ACF plot for b75")))
+acf(model5.sim$sims.matrix[,30], main = paste(c("ACF plot for b84")))
+acf(model5.sim$sims.matrix[,31], main = paste(c("ACF plot for b91")))
+acf(model5.sim$sims.matrix[,32], main = paste(c("ACF plot for b92")))
+acf(model5.sim$sims.matrix[,33], main = paste(c("ACF plot for b95")))
+acf(model5.sim$sims.matrix[,34], main = paste(c("ACF plot for b103")))
+acf(model5.sim$sims.matrix[,35], main = paste(c("ACF plot for b104")))
+acf(model5.sim$sims.matrix[,36], main = paste(c("ACF plot for b105")))
+acf(model5.sim$sims.matrix[,37], main = paste(c("ACF plot for b111")))
+acf(model5.sim$sims.matrix[,38], main = paste(c("ACF plot for b113")))
+acf(model5.sim$sims.matrix[,39], main = paste(c("ACF plot for b114")))
+acf(model5.sim$sims.matrix[,40], main = paste(c("ACF plot for b115")))
+acf(model5.sim$sims.matrix[,81], main = paste(c("ACF plot for deviance")))
+
+
+######################################################################
+# Initial Statistics & Plots for our Analysis for the Binomial Case
+#=====================================================================
+## Load the data into R.
+wines <- read.csv("C:\\Users\\30697\\Desktop\\06_winequality-red.csv", header = T, sep=";", stringsAsFactors = FALSE)
+
+## Change the values from mg/dm^3 to g/dm^3 for free and total sulfur 
+## dioxide.
+wines$free.sulfur.dioxide <- wines$free.sulfur.dioxide*0.001
+wines$total.sulfur.dioxide <- wines$total.sulfur.dioxide*0.001
+
+## Plot of the sensory data.
+plot(factor(wines$quality), xlab = "Sensory Preference (Median)", ylab = "Frequency (Red Wine Samples)")
+
+## Quality with 6 Categories (3-8).
+table(wines$quality)
+
+## Shift the response variable from 3 until 8, to 1 until 6.
+wines[wines[,12]==3,12] <- 1
+wines[wines[,12]==4,12] <- 2
+wines[wines[,12]==5,12] <- 3
+wines[wines[,12]==6,12] <- 4
+wines[wines[,12]==7,12] <- 5
+wines[wines[,12]==8,12] <- 6
+
+## Check if it worked.
+table(wines$quality)
+plot(factor(wines$quality), xlab = "Sensory Preference (Median)", ylab = "Frequency (Red Wine Samples)")
+
+## Split the data response into binary
+wines$quality <- ifelse(wines$quality<=3, 0, 1)
+y <- wines$quality
+table(wines$quality)
+# 10+53+681=744 zeros
+# 638+199+18=855 ones
+
+##===============================
+## Variable Selection using BAS
+##===============================
+library(BAS)
+wines.bas2 <- wines
+
+n <- 1599
+res <- bas.glm(quality~., family='binomial', data=wines.bas2, betaprior=g.prior(n), modelprior = beta.binomial(2,10))
+
+coef(res)
+summary(res)
+
+
+## Turn our data frame into a matrix and then into a list.
+wines <- scale(wines[,-12], center=TRUE, scale=TRUE) # if we want to center our values
+wines1 <- as.matrix(wines)
+y <- as.matrix(y)
+lwines <- list(y=y,x=wines1[,1:11])
+
+
+######################################################################
+# Run our Binomial Model in R.
+#=====================================================================
+## Load libraries.
+library(R2WinBUGS)
+library(BRugs)
+
+## Set the directory.
+openbugs.dir <- "D:\\OpenBUGS323"
+
+## A list of initials (one chain).
+inits6 <- list(  
+	list(b=rep(0, times=7)) )
+
+## The parameters of interest.
+parameter.names6 <- c('b', 'B')
+
+## The model (in OpenBUGS).
+model6.sim <- bugs( lwines, inits6, model.file = "C:\\Users\\30697\\Desktop\\binomial2.txt", parameters = parameter.names6,
+n.chains = 1, n.iter = 11000, n.burnin=1000, n.thin=1,  bugs.directory = openbugs.dir, debug=F, program="OpenBUGS")
+
+
+######################################################################
+# Check for convergence using plots and CODA
+#=====================================================================
+library(coda)
+temp<-as.mcmc.list(model5.sim)
+summary(temp)
+summary(temp)$statistics[,"Naive SE"]
+summary(temp)$statistics[,"Time-series SE"]
+batchSE(temp) 
+effectiveSize(temp)
+
+## Automated Convergence Tests.
+codamenu()
+2
+temp
+2
+1
+4
+3
+2
+4
+2
+8
+4
+y
+
+## Ergodic Plots for bs.
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+for (i in 1:7){
+   plot(cumsum(model1.sim$sims.matrix[,i])/1:length(model1.sim$sims.matrix[,i]), type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for b",i)))
+}
+plot(cumsum(model1.sim$sims.matrix[,15])/1:length(model1.sim$sims.matrix[,15]), type="l", ylab = "Cumsum Values", main = paste(c("Ergodic Mean Plot for deviance")))
+
+## Autocorrelation Plots for bs.
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+for (i in 1:7){
+   acf(model1.sim$sims.matrix[,i], main = paste(c("ACF plot for b",i)))
+}
+acf(model1.sim$sims.matrix[,15], main = paste(c("ACF plot for deviance")))
+
+## Density Plots for bs.
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+for (i in 1:7){
+   plot(density(model1.sim$sims.matrix[,i]), main = paste(c("Density plot for b",i)))
+}
+plot(density(model1.sim$sims.matrix[,15]), main = paste(c("Density plot for deviance")))
+
+## Trace Plots for b0s.
+# dev.off() # delete all previous plots
+par(mfrow=c(3,3)) # 9 plots per picture
+for (i in 1:7){
+  plot(model1.sim$sims.matrix[,i], type = "l", main = paste(c("Trace plot for b",i)))
+}
+plot(model1.sim$sims.matrix[,15], type = "l", main = paste(c("Trace plot for deviance")))

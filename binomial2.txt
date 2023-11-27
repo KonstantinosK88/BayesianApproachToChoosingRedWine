@@ -1,0 +1,27 @@
+# (Binomial) Logistic Regression Model Only important variables according to BAS (BIC prior)
+model {
+  for (i in 1:1599){             ## loop over observations
+    y[i,1] ~ dbern(p[i])         ## binary outcome
+    logit(p[i]) <- ystar[i]      ## logit link
+    ystar[i] <- b[1] +           ## regression structure for covariates
+                b[2]*x[i,2] + 
+                b[3]*x[i,5] + 
+                b[4]*x[i,6] + 
+                b[5]*x[i,7] + 
+                b[6]*x[i,10] +
+                b[7]*x[i,11]
+  }
+## ------------
+##    Priors
+## ------------
+ for (k in 1:7){
+  b[k] ~ dnorm(0.0, 1.0E-4)       ## low information priors
+ }
+
+## ------------------
+##  Exponated Values
+## ------------------
+ for (k in 1:7){
+  B[k] <- exp(b[k])
+ }
+}

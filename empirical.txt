@@ -1,0 +1,118 @@
+# multinomial logistic regression variable selection (empirical method)
+model {
+   for (i in 1:1599){                                     ## loop over observations
+     y[i,1] ~ dcat(p[i, 1:6])                             ## multinomial outcome
+
+     for (j in 1:5){                                      ## loop over categories
+      p[i,j] <- expeta[i,j]/(1 + expeta[i,1] +
+                             expeta[i,2] + expeta[i,3] + 
+                             expeta[i,4] + expeta[i,5])
+
+      expeta[i,j] <- exp(eta[i,j])
+      eta[i,j] <- gb0[j] +
+                  gb1[j]*x[i,1] + 
+                  gb2[j]*x[i,2] +
+                  gb3[j]*x[i,3] + 
+                  gb4[j]*x[i,4] + 
+                  gb5[j]*x[i,5] + 
+                  gb6[j]*x[i,6] +
+                  gb7[j]*x[i,7] + 
+                  gb8[j]*x[i,8] +
+                  gb9[j]*x[i,9] + 
+                  gb10[j]*x[i,10] + 
+                  gb11[j]*x[i,11]
+
+     }
+     expeta[i,6] <- 1.0                                  ## baseline (reference) category
+     p[i,6] <- 1/(1 + expeta[i,1] +
+                  expeta[i,2] + expeta[i,3] + 
+                  expeta[i,4] + expeta[i,5])
+   }
+## ------------
+##    Priors
+## ------------
+   for (k in 1:5){
+    b0[k] ~ dnorm(prop.mean.beta0[k], taub0[k])
+    taub0[k] <- (gamma0[k]/1599 + (1-gamma0[k]))/pow(prop.sd.beta0[k], 2)
+    gamma0[k] <- 1.0                 ## constants are always in the model
+    gb0[k] <- gamma0[k]*b0[k]
+
+    b1[k] ~ dnorm(prop.mean.beta1[k], taub1[k])
+    taub1[k] <- (gamma1[k]/1599 + (1-gamma1[k]))/pow(prop.sd.beta1[k], 2)
+    gamma1[k] ~ dbern(0.5)          ## Uniform
+#    gamma1[k] ~ dbern(p1)           ## Beta-binomial
+    gb1[k] <- gamma1[k]*b1[k]
+
+    b2[k] ~ dnorm(prop.mean.beta2[k], taub2[k])
+    taub2[k] <- (gamma2[k]/1599 + (1-gamma2[k]))/pow(prop.sd.beta2[k], 2)
+    gamma2[k] ~ dbern(0.5)          ## Uniform
+#    gamma2[k] ~ dbern(p2)           ## Beta-binomial
+    gb2[k] <- gamma2[k]*b2[k]
+
+    b3[k] ~ dnorm(prop.mean.beta3[k], taub3[k])
+    taub3[k] <- (gamma3[k]/1599 + (1-gamma3[k]))/pow(prop.sd.beta3[k], 2)
+    gamma3[k] ~ dbern(0.5)          ## Uniform
+#    gamma3[k] ~ dbern(p3)           ## Beta-binomial
+    gb3[k] <- gamma3[k]*b3[k]
+
+    b4[k] ~ dnorm(prop.mean.beta4[k], taub4[k])
+    taub4[k] <- (gamma4[k]/1599 + (1-gamma4[k]))/pow(prop.sd.beta4[k], 2)
+    gamma4[k] ~ dbern(0.5)          ## Uniform
+#    gamma4[k] ~ dbern(p4)           ## Beta-binomial
+    gb4[k] <- gamma4[k]*b4[k]
+
+    b5[k] ~ dnorm(prop.mean.beta5[k], taub5[k])
+    taub5[k] <- (gamma5[k]/1599 + (1-gamma5[k]))/pow(prop.sd.beta5[k], 2)
+    gamma5[k] ~ dbern(0.5)          ## Uniform
+#    gamma5[k] ~ dbern(p5)           ## Beta-binomial
+    gb5[k] <- gamma5[k]*b5[k]
+
+    b6[k] ~ dnorm(prop.mean.beta6[k], taub6[k])
+    taub6[k] <- (gamma6[k]/1599 + (1-gamma6[k]))/pow(prop.sd.beta6[k], 2)
+    gamma6[k] ~ dbern(0.5)          ## Uniform
+#    gamma6[k] ~ dbern(p6)           ## Beta-binomial
+    gb6[k] <- gamma6[k]*b6[k]
+
+    b7[k] ~ dnorm(prop.mean.beta7[k], taub7[k])
+    taub7[k] <- (gamma7[k]/1599 + (1-gamma7[k]))/pow(prop.sd.beta7[k], 2)
+    gamma7[k] ~ dbern(0.5)          ## Uniform
+#    gamma7[k] ~ dbern(p7)           ## Beta-binomial
+    gb7[k] <- gamma7[k]*b7[k]
+
+    b8[k] ~ dnorm(prop.mean.beta8[k], taub8[k])
+    taub8[k] <- (gamma8[k]/1599 + (1-gamma8[k]))/pow(prop.sd.beta8[k], 2)
+    gamma8[k] ~ dbern(0.5)          ## Uniform
+#    gamma8[k] ~ dbern(p8)           ## Beta-binomial
+    gb8[k] <- gamma8[k]*b8[k]
+
+    b9[k] ~ dnorm(prop.mean.beta9[k], taub9[k])
+    taub9[k] <- (gamma9[k]/1599 + (1-gamma9[k]))/pow(prop.sd.beta9[k], 2)
+    gamma9[k] ~ dbern(0.5)          ## Uniform
+#    gamma9[k] ~ dbern(p9)           ## Beta-binomial
+    gb9[k] <- gamma9[k]*b9[k]
+
+    b10[k] ~ dnorm(prop.mean.beta10[k], taub10[k])
+    taub10[k] <- (gamma10[k]/1599 + (1-gamma10[k]))/pow(prop.sd.beta10[k], 2)
+    gamma10[k] ~ dbern(0.5)         ## Uniform
+#    gamma10[k] ~ dbern(p10)         ## Beta-binomial
+    gb10[k] <- gamma10[k]*b10[k]
+
+    b11[k] ~ dnorm(prop.mean.beta11[k], taub11[k])
+    taub11[k] <- (gamma11[k]/1599 + (1-gamma11[k]))/pow(prop.sd.beta11[k], 2)
+    gamma11[k] ~ dbern(0.5)         ## Uniform
+#    gamma11[k] ~ dbern(p11)         ## Beta-binomial
+    gb11[k] <- gamma11[k]*b11[k]
+   }
+#  For the Beta-Binomial
+#   p1 ~ dbeta(2,10)
+#   p2 ~ dbeta(2,10)
+#   p3 ~ dbeta(2,10)
+#   p4 ~ dbeta(2,10)
+#   p5 ~ dbeta(2,10)
+#   p6 ~ dbeta(2,10)
+#   p7 ~ dbeta(2,10)
+#   p8 ~ dbeta(2,10)
+#   p9 ~ dbeta(2,10)
+#   p10 ~ dbeta(2,10)
+#   p11 ~ dbeta(2,10)
+}

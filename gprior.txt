@@ -1,0 +1,200 @@
+# multinomial logistic regression variable selection (gprior method)
+model {
+   for (i in 1:1599){                                     ## loop over observations
+     y[i,1] ~ dcat(p[i, 1:6])                             ## multinomial outcome
+
+     for (j in 1:5){                                      ## loop over categories
+      p[i,j] <- expeta[i,j]/(1 + expeta[i,1] +
+                             expeta[i,2] + expeta[i,3] + 
+                             expeta[i,4] + expeta[i,5])
+
+      expeta[i,j] <- exp(eta[i,j])
+      eta[i,j] <- alpha[j] +
+                  gb1[j]*x[i,1] + 
+                  gb2[j]*x[i,2] +
+                  gb3[j]*x[i,3] + 
+                  gb4[j]*x[i,4] + 
+                  gb5[j]*x[i,5] + 
+                  gb6[j]*x[i,6] +
+                  gb7[j]*x[i,7] + 
+                  gb8[j]*x[i,8] +
+                  gb9[j]*x[i,9] + 
+                  gb10[j]*x[i,10] + 
+                  gb11[j]*x[i,11]
+
+     }
+     expeta[i,6] <- 1.0                                  ## baseline (reference) category
+     p[i,6] <- 1/(1 + expeta[i,1] +
+                  expeta[i,2] + expeta[i,3] + 
+                  expeta[i,4] + expeta[i,5])
+   }
+## ------------
+##    Priors
+## ------------
+# Liang g-prior
+ logtau ~ dflat()
+ tau <- exp(logtau)
+####################################################################
+ for (j in 1:5) {
+  alpha[j] ~ dflat()
+ }
+####################################################################
+ B1[1:5] ~ dmnorm(mean.beta1[1:5], T1[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta1[j] <-  (1-gamma1[j])*prop.mean.beta1[j]
+  for (k in 1:5) {
+   T1[j,k] < - gamma1[j]*gamma1[k]*tau*XTX[j,k]/G + (1-gamma1[j]*gamma1[k])*equals(j,k)*pow(prop.sd.beta1[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma1[j] ~ dbern(0.5) # Uniform
+   gamma1[j] ~ dbern(p1)  # Beta-Binomial
+   gb1[j] <- gamma1[j]*B1[j]
+ }
+####################################################################
+ B2[1:5] ~ dmnorm(mean.beta2[1:5], T2[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta2[j] <-  (1-gamma2[j])*prop.mean.beta2[j]
+  for (k in 1:5) {
+   T2[j,k] < - gamma2[j]*gamma2[k]*tau*XTX[j,k]/G + (1-gamma2[j]*gamma2[k])*equals(j,k)*pow(prop.sd.beta2[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma2[j] ~ dbern(0.5) # Uniform
+   gamma2[j] ~ dbern(p1)  # Beta-Binomial
+   gb2[j] <- gamma2[j]*B2[j]
+ }
+####################################################################
+ B3[1:5] ~ dmnorm(mean.beta3[1:5], T3[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta3[j] <-  (1-gamma3[j])*prop.mean.beta3[j]
+  for (k in 1:5) {
+   T3[j,k] < - gamma3[j]*gamma3[k]*tau*XTX[j,k]/G + (1-gamma3[j]*gamma3[k])*equals(j,k)*pow(prop.sd.beta3[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma3[j] ~ dbern(0.5) # Uniform
+   gamma3[j] ~ dbern(p1)  # Beta-Binomial
+   gb3[j] <- gamma3[j]*B3[j]
+ }
+####################################################################
+ B4[1:5] ~ dmnorm(mean.beta4[1:5], T4[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta4[j] <-  (1-gamma4[j])*prop.mean.beta4[j]
+  for (k in 1:5) {
+   T4[j,k] < - gamma4[j]*gamma4[k]*tau*XTX[j,k]/G + (1-gamma4[j]*gamma4[k])*equals(j,k)*pow(prop.sd.beta4[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma4[j] ~ dbern(0.5) # Uniform
+   gamma4[j] ~ dbern(p1)  # Beta-Binomial
+   gb4[j] <- gamma4[j]*B4[j]
+ }
+####################################################################
+ B5[1:5] ~ dmnorm(mean.beta5[1:5], T5[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta5[j] <-  (1-gamma5[j])*prop.mean.beta5[j]
+  for (k in 1:5) {
+   T5[j,k] < - gamma5[j]*gamma5[k]*tau*XTX[j,k]/G + (1-gamma5[j]*gamma5[k])*equals(j,k)*pow(prop.sd.beta5[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma5[j] ~ dbern(0.5) # Uniform
+   gamma5[j] ~ dbern(p1)  # Beta-Binomial
+   gb5[j] <- gamma5[j]*B5[j]
+ }
+####################################################################
+ B6[1:5] ~ dmnorm(mean.beta6[1:5], T6[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta6[j] <-  (1-gamma6[j])*prop.mean.beta6[j]
+  for (k in 1:5) {
+   T6[j,k] < - gamma6[j]*gamma6[k]*tau*XTX[j,k]/G + (1-gamma6[j]*gamma6[k])*equals(j,k)*pow(prop.sd.beta6[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma6[j] ~ dbern(0.5) # Uniform
+   gamma6[j] ~ dbern(p1)  # Beta-Binomial
+   gb6[j] <- gamma6[j]*B6[j]
+ }
+####################################################################
+ B7[1:5] ~ dmnorm(mean.beta7[1:5], T7[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta7[j] <-  (1-gamma7[j])*prop.mean.beta7[j]
+  for (k in 1:5) {
+   T7[j,k] < - gamma7[j]*gamma7[k]*tau*XTX[j,k]/G + (1-gamma7[j]*gamma7[k])*equals(j,k)*pow(prop.sd.beta7[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma7[j] ~ dbern(0.5) # Uniform
+   gamma7[j] ~ dbern(p1)  # Beta-Binomial
+   gb7[j] <- gamma7[j]*B7[j]
+ }
+####################################################################
+ B8[1:5] ~ dmnorm(mean.beta8[1:5], T8[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta8[j] <-  (1-gamma8[j])*prop.mean.beta8[j]
+  for (k in 1:5) {
+   T8[j,k] < - gamma8[j]*gamma8[k]*tau*XTX[j,k]/G + (1-gamma8[j]*gamma8[k])*equals(j,k)*pow(prop.sd.beta8[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma8[j] ~ dbern(0.5) # Uniform
+   gamma8[j] ~ dbern(p1)  # Beta-Binomial
+   gb8[j] <- gamma8[j]*B8[j]
+ }
+####################################################################
+ B9[1:5] ~ dmnorm(mean.beta9[1:5], T9[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta9[j] <-  (1-gamma9[j])*prop.mean.beta9[j]
+  for (k in 1:5) {
+   T9[j,k] < - gamma9[j]*gamma9[k]*tau*XTX[j,k]/G + (1-gamma9[j]*gamma9[k])*equals(j,k)*pow(prop.sd.beta9[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma9[j] ~ dbern(0.5) # Uniform
+   gamma9[j] ~ dbern(p1)  # Beta-Binomial
+   gb9[j] <- gamma9[j]*B9[j]
+ }
+####################################################################
+ B10[1:5] ~ dmnorm(mean.beta10[1:5], T10[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta10[j] <-  (1-gamma10[j])*prop.mean.beta10[j]
+  for (k in 1:5) {
+   T10[j,k] < - gamma10[j]*gamma10[k]*tau*XTX[j,k]/G + (1-gamma10[j]*gamma10[k])*equals(j,k)*pow(prop.sd.beta10[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma10[j] ~ dbern(0.5) # Uniform
+   gamma10[j] ~ dbern(p1)  # Beta-Binomial
+   gb10[j] <- gamma10[j]*B10[j]
+ }
+####################################################################
+ B11[1:5] ~ dmnorm(mean.beta11[1:5], T11[1:5, 1:5])
+ for (j in 1:5) {
+  mean.beta11[j] <-  (1-gamma11[j])*prop.mean.beta11[j]
+  for (k in 1:5) {
+   T11[j,k] < - gamma11[j]*gamma11[k]*tau*XTX[j,k]/G + (1-gamma11[j]*gamma11[k])*equals(j,k)*pow(prop.sd.beta11[k],-2)
+  }
+ }
+ for (j in 1:5) {
+#   gamma11[j] ~ dbern(0.5) # Uniform
+   gamma11[j] ~ dbern(p1)  # Beta-Binomial
+   gb11[j] <- gamma11[j]*B11[j]
+ }
+####################################################################
+#  For the Beta-Binomial
+   p1 ~ dbeta(2,10)
+   p2 ~ dbeta(2,10)
+   p3 ~ dbeta(2,10)
+   p4 ~ dbeta(2,10)
+   p5 ~ dbeta(2,10)
+   p6 ~ dbeta(2,10)
+   p7 ~ dbeta(2,10)
+   p8 ~ dbeta(2,10)
+   p9 ~ dbeta(2,10)
+   p10 ~ dbeta(2,10)
+   p11 ~ dbeta(2,10)
+
+# hyper-prior
+G <- 1599
+}
