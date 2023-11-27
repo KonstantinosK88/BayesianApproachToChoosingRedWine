@@ -1,4 +1,4 @@
-# multinomial logistic regression variable selection (empirical method)
+# multinomial logistic regression variable selection (hyper-g method)
 model {
    for (i in 1:1599){                                     ## loop over observations
      y[i,1] ~ dcat(p[i, 1:6])                             ## multinomial outcome
